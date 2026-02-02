@@ -55,6 +55,12 @@ def configure_gpu() -> bool:
     return True
 
 
+def gpu_status() -> Tuple[bool, List[str], bool]:
+    gpus = tf.config.list_physical_devices("GPU")
+    gpu_names = [gpu.name for gpu in gpus]
+    return bool(gpus), gpu_names, tf.test.is_built_with_cuda()
+
+
 def board_to_matrix(board: Board) -> np.ndarray:
     m = np.zeros((8, 8, 12), dtype=np.float32)
     for square, piece in board.piece_map().items():
@@ -730,10 +736,14 @@ def parse_args():
 
 def main():
     gpu_enabled = configure_gpu()
+    has_gpu, gpu_names, built_with_cuda = gpu_status()
     if gpu_enabled:
         print("GPU detectada: usando RTX para treino/inferência.")
+        print("GPUs disponíveis:", ", ".join(gpu_names))
     else:
         print("GPU não detectada: usando CPU.")
+        if not built_with_cuda:
+            print("TensorFlow sem suporte CUDA. Instale tensorflow-gpu/CUDA compatível.")
 
     args = parse_args()
     if args.command == "train":
