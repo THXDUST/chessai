@@ -179,6 +179,16 @@ def rank_legal_moves(board: Board, model: Sequential) -> List[Tuple[chess.Move, 
     return ranked
 
 
+def aggregate_input_weights(weights: np.ndarray, hidden_indices: np.ndarray) -> np.ndarray:
+    if weights.shape[0] % 12 != 0:
+        plane_means = np.mean(weights, axis=0)
+        return np.tile(plane_means, (12, 1))[:, hidden_indices]
+    plane_size = weights.shape[0] // 12
+    reshaped = weights.reshape(12, plane_size, -1)
+    plane_means = reshaped.mean(axis=1)
+    return plane_means[:, hidden_indices]
+
+
 class TrainingGUI(tk.Tk):
     def __init__(self, model: Sequential, epochs: int, steps_per_epoch: int):
         super().__init__()
@@ -632,10 +642,7 @@ class NetworkWindow(tk.Toplevel):
         )
 
     def _aggregate_input_weights(self, weights: np.ndarray, hidden_indices: np.ndarray) -> np.ndarray:
-        plane_size = 64
-        weights = weights.reshape(12, plane_size, -1)
-        plane_means = weights.mean(axis=1)
-        return plane_means[:, hidden_indices]
+        return aggregate_input_weights(weights, hidden_indices)
 
     def _draw_connections(
         self,
