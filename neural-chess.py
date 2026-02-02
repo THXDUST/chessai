@@ -165,20 +165,6 @@ def predict_next_move(board: Board, model: Sequential) -> Optional[chess.Move]:
     return None
 
 
-def rank_legal_moves(board: Board, model: Sequential) -> List[Tuple[chess.Move, float]]:
-    board_matrix = board_to_matrix(board).reshape(1, 8, 8, 12)
-    predictions = model.predict(board_matrix, verbose=0)[0]
-    ranked: List[Tuple[chess.Move, float]] = []
-    for move in board.legal_moves:
-        try:
-            idx = encode_move(move)
-        except KeyError:
-            continue
-        ranked.append((move, float(predictions[idx])))
-    ranked.sort(key=lambda item: item[1], reverse=True)
-    return ranked
-
-
 def train_model(
     pgn_files: List[str],
     epochs: int,
@@ -282,7 +268,6 @@ class ChessGUI(tk.Tk):
         ai_frame = ttk.Frame(board_frame)
         ai_frame.pack(pady=4)
         ttk.Button(ai_frame, text="Sugestão IA", command=self._suggest_move).pack(side=tk.LEFT, padx=4)
-        ttk.Button(ai_frame, text="IA joga", command=self._ai_move).pack(side=tk.LEFT, padx=4)
         self.ai_label = ttk.Label(ai_frame, text="")
         self.ai_label.pack(side=tk.LEFT, padx=4)
 
@@ -293,14 +278,7 @@ class ChessGUI(tk.Tk):
         self.moves_text.pack(fill=tk.BOTH, expand=True)
         self.moves_text.configure(state=tk.DISABLED)
 
-        ranking_frame = ttk.Frame(right_frame)
-        ranking_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(12, 0))
-        ttk.Label(ranking_frame, text="Ranking IA (melhor → pior):").pack(anchor=tk.W)
-        self.ranking_list = tk.Listbox(ranking_frame, width=30, height=25)
-        self.ranking_list.pack(fill=tk.BOTH, expand=True)
-
         self._draw_board()
-        self._update_ranking()
 
     def _populate_ranges(self):
         range_size = int(self.range_size_var.get())
@@ -348,7 +326,6 @@ class ChessGUI(tk.Tk):
         self._render_moves()
         self._draw_board()
         self.ai_label.configure(text="")
-        self._update_ranking()
 
     def _render_moves(self):
         if not self.current_game:
@@ -405,7 +382,6 @@ class ChessGUI(tk.Tk):
         self.move_index += 1
         self._draw_board()
         self.ai_label.configure(text="")
-        self._update_ranking()
 
     def _prev_move(self):
         if not self.current_game:
@@ -416,7 +392,6 @@ class ChessGUI(tk.Tk):
         self.move_index -= 1
         self._draw_board()
         self.ai_label.configure(text="")
-        self._update_ranking()
 
     def _suggest_move(self):
         if self.model is None:
@@ -427,33 +402,6 @@ class ChessGUI(tk.Tk):
             self.ai_label.configure(text="Sem lance legal")
         else:
             self.ai_label.configure(text=f"IA sugere: {move.uci()}")
-        self._update_ranking()
-
-    def _ai_move(self):
-        if self.model is None:
-            messagebox.showwarning("Modelo", "Nenhum modelo carregado para jogar.")
-            return
-        move = predict_next_move(self.current_board, self.model)
-        if move is None:
-            self.ai_label.configure(text="Sem lance legal")
-            return
-        self.current_board.push(move)
-        self.move_index = min(self.move_index + 1, len(self.current_game.moves) if self.current_game else 0)
-        self._draw_board()
-        self.ai_label.configure(text=f"IA jogou: {move.uci()}")
-        self._update_ranking()
-
-    def _update_ranking(self):
-        self.ranking_list.delete(0, tk.END)
-        if self.model is None:
-            self.ranking_list.insert(tk.END, "Modelo não carregado.")
-            return
-        rankings = rank_legal_moves(self.current_board, self.model)
-        if not rankings:
-            self.ranking_list.insert(tk.END, "Sem lances legais.")
-            return
-        for move, score in rankings:
-            self.ranking_list.insert(tk.END, f"{move.uci()}  {score:.3f}")
 
     def _show_network(self):
         if self.model is None:
